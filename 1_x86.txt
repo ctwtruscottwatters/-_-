@@ -1,0 +1,502 @@
+otool
+symbols
+
+CISC - RISC
+
+endianness
+
+two's complement, one's complement, binary - decimal - hex conversions (shr, shl, radices, e.t.c.)
+
+8 general purpose registers and the instruction pointer, x86 has 32-bit registers, x86-64 has 64-bit registers
+Register conventions:
+
+EAX - Stores function return values
+EBX - Base pointer to the data section
+ECX - Counter for string and loop operations
+EDX - I/O pointer
+
+ESI - Source pointer for string operations
+EDI - Destination pointer for string operations
+ESP - Stack pointer
+EBP - Stack frame base pointer
+EIP - Pointer to the next instruction to execute (instruction pointer)
+
+Caller-save registers - EAX, EDX, ECX
+
+
+	If the caller has anything in the registers that it cares about
+	the caller is in charge of saving the value before a call to a
+	subroutine, and restoring the value after the call returns
+
+	Put another way, the callee can (and is highly likely to)
+	modify the values in caller-save registers
+SAVING REGISTERS FROM STACK, RESTORING REGISTERS
+
+Callee-save registers - EBP, EBX, ESI, EDI
+
+	If the callee needs to use more registers than are saved by the
+	caller, the callee is responsible for making sure the values are
+	stored / restored
+
+	Put another way, the callee must be a good citizen and not
+	modify registers which the caller didn't save, unless the
+	callee itself saves and restores the existing values
+
+	The call to a function does not alter these registers
+
+	It can use the registers but saving them and restoring them
+
+8/16/32 bit register addressing
+
+EAX
+	AX
+
+	AH	AL
+
+ECX
+
+	CX
+
+	CH	CL
+
+EDX
+
+	DX
+
+	DH	DL
+EBX
+
+	BX
+
+	BH	BL
+
+
+ESP
+
+	SP
+
+EBP
+
+	BP
+
+ESI
+
+	SI
+
+EDI
+
+	DI
+
+EIP
+
+	IP
+
+
+EFLAGS
+
+	EFLAGS register holds many single-bit flags. 
+
+	Such as:
+
+	- Zero flag (ZF), Set the result if some instruction is zero, cleared otherwise
+
+	- Sign flag (SF), Set equal to the most-significant bit of the result, which is the sign bit of a signed integer (0 indicates a positive value, 1 a negative value)
+
+
+The one-byte NOP instruction is a mnemonic for the XCHG EAX, EAX instruction (from book p. 112)
+
+The stack
+
+	The stack is a conceptual area of main memory (RAM) which is designated by the operating system when a program is started.
+
+	A stack is a LIFO (last-in, first-out) data structure in which memory is pushed onto the top of the top of the stack and popped of the top of the stack.
+
+	By convention the stack grows toward lower memory addresses. Adding something to the stack means the top of the stack is now at a lower memory address.
+
+	ESP points to the top of the stack, the lowest address which is being used
+
+	While data exists at addresses beyond the top of the stack, it is considered undefined
+
+	The stack keeps track of which functions were called before the current one, it holds local variables and
+	is frequently used to pass arguments to the next function to be called
+
+	A firm understanding of what is happening on the stack is essential to understanding a program's operation
+
+	** POP ** e.g. POP EAX, EBX, ECX, EDX, ESI, EDI, ESP, EBP
+
+	** PUSH ** PUSH word, dword, qword onto the stack
+
+		x86, always a DWORD, can be either an immediate (numeric constant), or the value in a register
+
+		The push instruction automatically decrements the stack pointer, ESP, by 4
+
+	CALLING CONVENTIONS
+
+		How code calls a subroutine is compiler-dependent and configurable. 
+
+		cdecl, stdcall
+
+		x86 calling conventions
+
+	"C declaration" - most common calling convention
+
+	Function parameters are pushed onto the stack from right to left
+
+	Saves the old stack frame pointer and sets up a new stack frame
+
+	EAX or EAX:EDX returns the result for primitive data types
+
+	Caller is responsible for cleaning up the stack
+
+	Calling conventions, Microsoft C++ code e.g. Win32 API
+
+		Function parameters pushed onto the stack from right to left
+		Saves the old stack frame pointer and sets up a new stack frame
+		EAX:EDX or EAX returns the result for primitive data types
+
+	Callee is repsonsible for cleaning up any parameters it takes
+
+	** CALL ** 
+
+	CALL's job is to transfer control to a different function, in a way that control can be later resumed where
+	it left off. First it pushes the address of the next function onto the stack (for use by RET when the procedure
+	is done). Then it changes EIP to the address given in the instruction. Destination addresses can be specified
+	in multiple ways:
+
+		- Absolute address
+
+		- Relative address (relative to the end of the instruction)
+
+	** RET ** 
+
+	Two forms
+
+		- Pop the top of the stack into EIP
+
+			(in this form the instruction is just written as RET)
+
+			typically used by cdecl functions
+
+		- Pop the top of the stack into EIP and add a constant number of bytes to ESP
+
+			e.g. RET 0x8, RET 0x20
+
+			typically used by stdcall functions
+
+	p. 133
+
+	** MOV **
+
+		- register to register
+		- memory to register, register to memory
+		- immediate to register, immediate to memory
+
+		no memory to memory
+
+		memory addresses are given in r/m32 form (talked about later) 
+
+
+Stack frame operation
+			    stack bottom
+
+| Local Variables | ------- | main() |
+			    | undef  |
+			    | undef  |
+
+
+
+| Local Variables | ------- | main() |
+
+| Caller-save 	  |	    | undef  |
+| registers       |	    | undef  |
+
+| Arguments to    |
+| pass to callee  |
+
+
+| Local Variables | ------- | main() |
+
+| Caller-save 	  |	    | foo()'s|
+			    | frame  |
+
+| registers       |	    | undef  |
+
+| Arguments to    |
+| pass to callee  |
+
+| caller's RET    |
+
+| Frame pointer   |
+
+EBP always starts at a stack frame
+
+| Local Variables | ------- | main() |
+
+| Caller-save 	  |	    | foo()'s|
+			    | frame  |
+
+| registers       |	    | undef  |
+
+| Arguments to    |
+| pass to callee  |
+
+| caller's RET    |
+
+| Frame pointer   |
+
+| Callee-save     |
+| r/m32           |
+
+| Local variables |
+
+| Local Variables | ------- | main() |
+
+| Caller-save 	  |	    | foo()'s|
+| registers       |	    | frame  |
+
+| Arguments to    |	    | undef  |
+| pass to callee  | 
+
+
+
+Compile with GCC on a UNIX/LINUX system
+Compile with Visual Studio C++ cl.exe
+
+"r/m32" addressing forms
+
+	** LEA ** Load Effective Address
+
+	** ADD and SUB ** 
+
+NOP
+PUSH / POP
+CALL / RET
+MOV
+LEA
+ADD / SUB
+
+
+
+	(RET? EIP POP, e.g. RETN, RETN 4, RETN 8)
+
+CONTROL FLOW
+
+	Two forms of control flow
+
+		- Conditional (go somewhere if a condition is met, e.g. 'if', 'switch', 'for(i = 0; i < n ; ++i)'
+
+		- Unconditional (go somewhere no matter what, e.g. 'function(int, double, float, char, char[], char **)', 'goto', exceptions, interrupts)
+
+We have already seen procedure calls manifest themselves as push / call / ret
+
+Let's see how goto manifests itself 
+
+
+
+** JMP **
+
+	- Change EIP to the given address
+
+	- Main forms of the address
+
+		** SHORT RELATIVE
+
+		- JMP 0x00402481 doesn't have the number 0x00402481 in it, it is simply just JMP 0xEE bytes forward
+
+		** NEAR RELATIVE
+
+		- 4 byte displacement from current EIP
+
+		** ABSOLUTE
+
+		- Hardcoded address in function
+
+		- Absolute indirect (address calculated with r/m32)
+
+		JMP -2 (infinite loop for short relative JMP)
+
+		p. 129
+
+
+
+** JCC ** 
+
+	- Jump if condition is met
+
+	There are more than 4 pages of conditional jump types, luckily most are synonyms for each other
+
+	- JNE == JNZ (Jump if not equal, Jump if not zero, both check the EFLAGS register ZF, zero flag) e.g. ZF == 0
+
+	p. 137
+
+NOTABLE CONDITIONAL JUMP INSTRUCTIONS (refer to manual, online references)
+
+	JZ / JE: if ZF == 1
+	JNZ / JNE: if ZF == 0
+	JLE / JNG: if ZF == 1 or SF != OF
+	JGE / JNL: if SF == OF
+	JBE: if CF == 1 or ZF == 1
+	JB: if CF == 1
+FLAG SETTING
+
+	- Before you can do a conditional jump, you need something to set the condition flags for you
+
+	- Typically done with CMP, TEST, or whatever instructions are already inline and happen to have
+		flag setting side effects
+
+** CMP ** Compare two operands
+
+	" The comparison is performed by subtracting the second operand from the first operand and setting the
+		status flags in the same manner as the SUB instruction "
+
+	What's the difference from just doing SUB? Difference is that with SUB the result has to be stored
+		somewhere. With CMP the result is computed, the flags are set, but the result is discarded
+		Thus this only sets flags and doesn't mess up any of your registers
+
+
+	- Modifies CF, OF, SF, ZF, AF, and PF (implies that SUB modifies all those too)
+
+	p. 138
+
+** TEST ** Logical compare
+
+	" Computes the bit-wise logical AND of the first operand (source 1 operand) and the second operand
+		(source 2 operand) and sets the SF, ZF, and PF status flags according to the result. "
+
+	- Like CMP, sets flags, and throws away the result
+
+	p. 232
+
+
+
+Refresher - Boolean (bitwise) logic
+
+AND &	OR |	XOR ^	NOT ~
+
+
+** AND ** Logical AND
+
+	Destination operand can be r/m32 or register
+
+	Source operand can be r/m32 or register or immediate (No source `and` destination as r/m32s)
+
+and al, bl	and al, 0x42
+	p. 231
+
+** OR ** Logical Inclusive OR
+
+	- Destination can be r/m32 or register
+
+	- Source operand can be r/m32 or register or immediate ("  ")
+
+or al, bl	or al, 0x42
+
+	p. 231
+
+** XOR ** Logical Exclusive OR
+
+	- Destination can be r/m32 or register
+
+	- Source operand can be r/m32 or register or immediate (" ")
+
+xor al, al	xor al, 0x42
+
+	XOR is commonly used to zero a register, by XORing it with itself, because it's faster than MOV
+
+	p. 231
+
+** NOT ** One's Complement Negation
+
+	- Single source/destination operand can be r/m32
+
+not al		not [al + bl]
+
+
+
+************************************************************************************************
+|	NOP	PUSH / POP	CALL / RET	MOV / LEA	ADD / SUB	JMP / JCC	|
+|												|
+|	CMP / TEST	AND/OR/XOR/NOT								|
+|												|
+|_______________________________________________________________________________________________|
+
+NOP 
+
+PUSH / POP
+
+CALL / RET
+
+MOV / LEA 
+
+ADD / SUB
+
+NPPCR
+MLASJJ
+CT
+AOXN
+
+5624
+
+** SHL ** Shift Logical Left
+** SHR ** Shift Logical Right
+** IMUL ** Signed Multiply
+** DIV ** Unsigned Divide
+** REP STOS ** Repeat Store String
+
+p. 35 lecture notes
+
+** REP MOVS ** Repeat Move Data String to String
+
+** LEAVE ** High Level Procedure Exit
+
+NOP
+PUSH / POP
+CALL / RET
+MOV / LEA
+ADD / SUB
+JMP / JCC
+CMP / TEST
+AND / OR / XOR / NOT
+
+SHL / SHR
+
+IMUL / DIV
+
+REP STOS / REP MOV
+
+LEAVE
+
+
+
+
+_________       __         _________
+|__   ___|     /  \       |___   ___|
+   | |        / __ \          | |
+   | |       / /__\ \         | |
+   | |      / /    \ \     ___| |___
+   |_|     /_/      \_\   |_________|
+
+big bro <3 <3 <3 
+POP QUIZ
+
+EAX, EBX, ECX, EDX, ESI, EDI, ESP, EBP, EIP
+
+1) EAX, stores return values
+2) EBX, base pointer to data section
+3) ECX, counter for string and loop operations
+4) EDX, ? I/O pointer
+5) ESI, source pointer for string operations
+6) EDI, destination pointer for string operations
+7) ESP, stack pointer
+8) EBP, stack frame base pointer
+9) EIP, instruction pointer
+
+1) EAX, stores return values
+2) EBX, base pointer to data section
+3) ECX, counter for string and loop operations
+4) EDX, I/O pointer
+5) ESI, source pointer for string operations
+6) EDI, destination pointer for string operations
+7) ESP, stack pointer
+8) EBP, stack frame base pointer
+9) EIP, instruction pointer

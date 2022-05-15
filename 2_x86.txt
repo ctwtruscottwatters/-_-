@@ -1,0 +1,372 @@
+Part 1 - Segmentation
+Part 2 - Paging
+Part 3 - Interrupts
+Part 4 - Debugging, I/O, Misc fun on a bun
+
+IA32
+
+IA-32 System-Level Registers and Data Structures
+
+** CPUID ** CPU (feature) identification
+
+	- Different processors support different features
+
+	- CPUID is how we know if the chip we're running on supports newer features, such as hardware
+		virtualisation, 64-bit mode, hyperthreading, thermal monitors, etc.
+
+	- CPUID doesn't have operands. Rather it "takes input" as value preloaded into EAX
+		(and possibly ECX). After it finishes the output is stored to EAX, EBX,
+		ECX, and EDX.
+
+	0F A2	CPUID	Returns processor identification and feature information to the EAX, EBX
+			ECX, and EDX registers, as determined by input in EAX (in some cases,
+			ECX as well).
+
+
+** PUSHFD ** Push EFLAGS onto Stack
+
+	9C	PUSHF	Push lower 16 bits of EFLAGS
+
+	9C	PUSHFD	Push EFLAGS
+
+	9C	PUSHFD	Push RFLAGS
+
+	- If you need to read the entire EFLAGS register, make sure you use PUSHFD, not just PUSHF
+		(Visual Studio 2008 forces the 16 bit form if you don't have the D)
+
+** POPFD ** Pop Stack into EFLAGS
+
+	9D		POPF	Pop top of stack into lower 16 bits of EFLAGS
+
+	9D		POPFD	Pop top of stack into EFLAGS
+
+	REX.W + 9D	POPFQ	Pop top of stack and zero-extend into RFLAGS
+
+	- There are some flags which will not be transferred from the stack to EFLAGS unless you're
+		in ring 0
+
+	- If you need to set the entire EFLAGS register, make sure you use POPFD, not just POPF
+		"" ""
+
+p. 17 intmx86 lecture slide one - Some Example CPUID Inputs and Outputs
+
+
+PROCESSOR MODES
+
+
+In the beginning, there was real mode, and it sucked.
+
+	- Real-address mode
+
+		"This mode implements the programming environment of the Intel 8086 processor with extensions
+			(such as the ability to switch to protected or system management mode). The processor
+			is placed in real-address mode following a power-up or reset.
+
+	- DOS runs in real mode
+
+	- No virtual memory, no privilege rings, 16 bit mode
+
+
+	- Protected Mode - This mode is the native state of the processor. Among the capabilities of protected
+				mode is the ability to directly execute 'Real-address mode' 8086 software in a
+				protected, multi-tasking environment. This feature is called virtual-8086 mode
+				although it is not actually a processor mode. Virtual-8086 mode is actually a
+				protected mode attribute that can be enabled for any task
+
+	- Virtual-8086 is just for backwards compatability, and I point it out only to say that Intel says it's
+		not really its own mode
+
+	- Protected mode adds support for virtual memory and privilege rings
+
+	- Modern OSes operate in protected mode
+
+
+	- System Management Mode - This mode provides an operating system or executive with a transparent mechanism
+					for implementing platform-specific functions such as power management and
+					system security. The processor enters SMM when the external SMM interrupt pin
+					(SMI#) is activated or an SMI is received from the advanced programmable 
+					interrupt controller (APIC).
+
+	- SMM has become a popular target for advanced rootkit discussions recently because access to SMM memory is
+		locked so that neither ring 0 nor VMX hypervisors can access it. Thus is VMX is more privileged than
+		ring 0 ("ring -1"), SMM is more privileged than VMX ("ring -2") because a hypervisor can't even read
+		SMM memory.
+
+	- Reserving discussion of VMX and SMM for Advanced x86 class
+
+Vol. 1, Sect 3.1
+
+	p. 23 lecture notes 1
+
+	Figure 1-6 Operating Modes of the AMD64 Architecture
+
+		e.g. 64 bit mode, compatability mode (long mode) 
+			Protected Mode, Virutal 8086 Mode
+			Real Mode, System Management Mode
+
+PRIVILEGE RINGS
+
+	MULTICS was the first OS with support for privilege rings
+
+	x86's rings are also enforced by hardware
+
+	You often hear that normal programs execute in ring 3, (userspace/usermode), and the privileged code
+	runs in ring 0 (kernelspace / kernelmode)
+
+	The lower the ring number, the more privileged the code is
+
+	In order to find the rings, we need to understand a capability called segmentation
+
+	Vol 3a, Sect 5.5 (Level 0 - OS kernel, Level 1 - OS Services, Level 2 - OS Services, Level 3 - Applications)
+
+	Paravirtualized Xen (Requires a modified guest OS)
+
+	Figure 5: Execution mode
+
+		level3
+
+		level2
+
+		level1
+
+		level0
+
+		Xen
+
+		Guest OS
+
+		Application
+
+		(Newest Xen instead uses HW VMX to be more privileged than the OS kernel)
+
+	Segmentation
+
+		- "Segmentation provides a mechanism for dividing the processor's addressable memory space
+			(called the linear address space) into smaller protected address spaces called segments.")
+
+		Figure 3-4 - Multi-segment model
+
+		Vol 3a, Sect 3.1 & 3.2.3
+
+
+
+		Segment registers, segment descriptors, linear address space (or physical memory)
+
+		CS			Access			stack
+					Limit			code
+		SS			Base address		data
+								data
+		DS						data
+
+		ES
+
+		FS
+
+		GS
+
+
+	Segment addressing
+
+		- "To locate a byte in a particular segment, a logical address (also called a far pointer)
+			must be provided. A logical address consists of a segment selector and an offset."
+
+		- "The physical address space is defined as the range of addresses that the processor can
+			generate on its address bus."
+
+				- Normally the physical address space is based on how much RAM you have
+					installed, up to a maximum of 2^32 (4GB). But there is a
+					mechanism (physical address extensions - PAE) which we will talk
+					about later which allows systems to access a space up to 2^36
+					(64GB).
+
+				- Basically a hack for more than 4GB of RAM but who aren't using a 64 bit
+					OS.
+
+			- Linear address space is a flat 32 bit space
+
+			- If paging (talked about later) is disabled, linear address space is mapped 1:1 to
+				physical address space
+
+		Vol. 3a, Sect 3.1
+
+
+	Segmentation restated
+
+		- Segmentation is not option
+
+		- Segmentation translates logical addresses to linear addresses automatically in hardware by
+			using table lookups
+
+		- Logical address (also called a far pointer) = 16 bit selector + 32 bit offset
+
+		- If paging (talked about later) is disabled, linear addresses map directly to physical
+			addresses
+
+
+		Figure 3-5. Logical to Linear Address Translation
+
+		Logical Address, Segment Selector
+
+		Descriptor Table, Segment Descriptor
+
+			Base Address
+
+		Linear Address, Offset (effective address)
+
+
+		Figure 3-1. Segmentation and Paging
+
+		Vol. 3a, Sect 3.1
+
+
+	Segment Selectors
+
+		- A segment selector is a 16-bit value held in a segment register
+
+			It is used to select an index for a segment descriptor from one of two tables
+
+			- GDT (Global Descriptor Table), for use system-wide
+
+			- LDT (Local Descriptor Table), intended to be a table per-process and switched when the
+				kernel switches between process contexts
+
+		- Note that the table index is actually 13 bits not 16, so the tables can each hold 2^13 = 8192
+			descriptors
+
+
+		Figure 3-6. Segment Selector
+
+		Table Indicator (0 = GDT, 1 = LDT), Requested Privilege Level
+
+
+	The Six Segment Registers
+
+		- CS, code segment
+
+		- SS, stack segment
+
+		- DS, data segment
+
+		- ES/FS/GS, Extra (usually data) segment registers
+
+		- The "hidden part" is like a cache so that segment descriptor information doesn't have to be looked
+			up each time.
+
+	Figure 3-7. Segment Registers
+
+	Visible part, hidden part, segment selector, base address, limit, access information
+
+	CS
+
+	SS
+
+	DS
+
+	ES
+
+	FS
+
+	GS
+
+
+	Implicit use of segment registers
+
+	- When you're addressing the stack, you're implicitly using a logical address that is using the SS (stack segment)
+		register as the segment selector, (i.e. ESP == SS:ESP)
+
+	- Even if a disassembler doesn't show it, the use of segment registers is built into some of your favourite
+
+		F3 A5		REP MOVS m32, m32		Move (E)CX doublewords from DS:[(E)SI] to ES:[(E)DI]
+
+
+	Explicit use of segment registers
+
+	- You can write assembly which explicitly specifies which segment register it wants to use. Just prefix the
+		memory address with a segment register and colon
+
+	- e.g. "mov eax, [ebx]", as opposed to "mov eax, fs:[ebx]"
+
+	- The assembly just puts a prefix on the instruction to say "when this instruction is asking for memory, it's
+		actually asking for memory in this segment." 
+
+	- In this way you're actually specifying a full logical address / far pointer
+
+
+
+	Inferences
+
+	- Windows maintains different CS, SS, & FS segment selectors for userspace processes vs kernel ones
+
+	- The RPL field seems to correlate with the ring for kernel or userspace
+
+	- Windows doesn't change DS or ES when moving between userspace and kernelspace (they were the exact same values)
+
+	- Windows doesn't use GS
+
+
+	One more time
+
+	One of the segment registers (SS/CS/DS/ES/FS/GS), address used in some assembly instruction, GDT or LDT
+
+	Figure 3-5. Logical Address to Linear Address Translation
+
+	Logical address, seg. selector
+
+	Descriptor table, seg. descriptor
+
+	Base address
+
+	Offset (effective address)
+
+	Linear address
+
+	+
+
+
+
+	GDT & LDT
+
+	Segment Selector, Global Descriptor Table (TI = 0), Local Descriptor Table (TI = 1)
+
+	All entries in these tables are "Segment Descriptor" structures
+
+	GDTR Register, LDTR Register
+
+	Limit, Base Address; Limit, Base Address, Seg. Sel.
+
+	Special registers point to the base of the tables and specify their size
+
+	Fig. 3-1. Global and Local Descriptor Tables
+
+
+	Global Descriptor Table Register (GDTR)
+
+	Vol 3a. Figure 2-5
+
+	- The upper 32 bits ("base address") of the register specify the linear address where the GDT is stored
+
+	- The lower 16 bits ("table limit") specify the size of the table in bytes
+
+	- Special instructions used to load a value into the register or store the value out to memory
+
+		- LGDT (load 6 bytes from memory into GDTR)
+		- SGDT (store 6 bytes of GDTR to memory)
+
+	Local Descriptor Table Register (LDTR)
+
+	Vol 3a. Figure 2-5
+
+	- Like the segment registers, the LDT has a visible part, the segment selector, and a hidden part, the
+		cached segment info. which specifies the size of the LDT
+
+		- The selector's "Table Indicator" (T) bit must be set to 0 to specify that it's selecting from
+			the GDT, not from itself ;)
+
+	- Special instructions used to load a value into the register or store the value out to memory
+
+		- LLDT (load 16 bit segment selector into LDTR)
+
+		- SLDT (store 16 bit segment selector of LDTR to memory)
+
+	Segment Descriptors
+
