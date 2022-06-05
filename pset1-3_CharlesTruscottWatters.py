@@ -7,7 +7,7 @@ runfile('C:/Users/Charles_Truscott/.spyder-py3/temp.py', wdir='C:/Users/Charles_
 Longest substring in alphabetical order is: pqrstuv
 
 """
-s = 'xyzcharlesabcstevemnoharrowpqrstuvjames'
+s = 'xyzcharlesabcstevemnoharrowpqrstuvjamespqstuvwxyz'
 
 num_posn = []
 counter = 0
@@ -26,6 +26,7 @@ for n in num_posn:
     i = 1
     j = 2
     string += s[n]
+    s += "\x00\x00"
     while (j <= len(s) - n - 2):
        # print("{} {} {}".format(n, i, j))
         #print(s[n], s[n + i], s[n + j])
